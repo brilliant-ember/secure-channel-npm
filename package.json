@@ -1,0 +1,62 @@
+{
+  "name": "@brilliant-ember/secure-channel",
+  "version": "1.0.2",
+  "description": "Cross-platform (Node & browser) authenticated, encrypted channel: X25519 key-exchange + HKDF + AES-GCM **and** Ed25519 sign/verify in one zero-dependency TypeScript package",
+  "main": "dist/node/index.js",
+  "browser": "dist/browser/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "npm run build:node && npm run build:browser",
+    "build:node": "tsc -p tsconfig.node.json",
+    "build:browser": "tsc -p tsconfig.browser.json",
+    "prepublishOnly": "npm run build",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "keywords": [
+    "crypto",
+    "key-exchange",
+    "x25519",
+    "ed25519",
+    "sign",
+    "verify",
+    "hkdf",
+    "aes-gcm",
+    "cross-platform",
+    "typescript",
+    "secure-channel"
+  ],
+  "author": "Mohammed Al-Ameen",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/brilliant-ember/secure-channel-npm"
+  },
+  "engines": {
+    "node": ">=15.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "@types/jest": "^29.5.0",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "dist/**/*"
+  ],
+  "exports": {
+    ".": {
+      "node": {
+        "import": "dist/node/index.js",
+        "require": "dist/node/index.js"
+      },
+      "browser": {
+        "import": "dist/browser/index.js",
+        "require": "dist/browser/index.js"
+      },
+      "default": "dist/node/index.js"
+    }
+  }
+}
