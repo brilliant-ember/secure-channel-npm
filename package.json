@@ -1,6 +1,6 @@
 {
   "name": "@brilliant-ember/secure-channel",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Cross-platform (Node & browser) authenticated, encrypted channel: X25519 key-exchange + HKDF + AES-GCM **and** Ed25519 sign/verify in one zero-dependency TypeScript package",
   "main": "dist/node/index.js",
   "browser": "dist/browser/index.js",
@@ -49,14 +49,14 @@
   "exports": {
     ".": {
       "node": {
-        "import": "dist/node/index.js",
-        "require": "dist/node/index.js"
+        "import": "./dist/node/index.js",
+        "require": "./dist/node/index.js"
       },
       "browser": {
-        "import": "dist/browser/index.js",
-        "require": "dist/browser/index.js"
+        "import": "./dist/browser/index.js",
+        "require": "./dist/browser/index.js"
       },
-      "default": "dist/node/index.js"
+      "default": "./dist/node/index.js"
     }
   }
 }

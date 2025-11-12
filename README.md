@@ -104,7 +104,7 @@ export function SecureComponent() {
 
 ```
 
-### Common 
+### Signature and Verficiation
 
 ```typescript
 
@@ -121,4 +121,66 @@ console.log('Signature:', signature);
 // Verify signature
 const isValid = await sig.verify(signature, 'important data');
 console.log('Valid:', isValid);
+```
+
+### Helpers
+
+#### Basic Base64 Conversion
+
+```javascript
+import { byteArrayToBase64, base64StringToByteArr } from '@brilliant-ember/secure-channel';
+
+// Convert text to base64 and back
+const text = "Hello World";
+const bytes = new TextEncoder().encode(text);
+const base64 = byteArrayToBase64(bytes);
+console.log('Base64:', base64); // "SGVsbG8gV29ybGQ="
+
+const decodedBytes = base64StringToByteArr(base64);
+const decodedText = new TextDecoder().decode(decodedBytes);
+console.log('Decoded:', decodedText); // "Hello World"
+
+```
+#### BigInt Helpers for Timestamps/IDs
+
+```javascript
+import { bigIntToBase64, base64ToBigInt } from '@brilliant-ember/secure-channel';
+
+// Store timestamps as compact base64
+const timestamp = BigInt(Date.now());
+const timestampB64 = bigIntToBase64(timestamp);
+console.log('Timestamp base64:', timestampB64);
+
+const recovered = base64ToBigInt(timestampB64);
+console.log('Recovered timestamp:', Number(recovered));
+
+// For message IDs
+const messageId = 1234567890123456789n;
+const idB64 = bigIntToBase64(messageId);
+console.log('Message ID:', idB64);
+
+```
+#### Number Helpers (Safe Integer Range)
+
+```javascript
+
+import { numberToBase64, base64ToNumber } from '@brilliant-ember/secure-channel';
+
+// For smaller numbers
+const count = 1234567890;
+const countB64 = numberToBase64(count);
+console.log('Count base64:', countB64);
+
+const recoveredCount = base64ToNumber(countB64);
+console.log('Recovered count:', recoveredCount);
+```
+#### Random Bytes
+
+```javascript
+
+import { generateRandomBytes } from '@brilliant-ember/secure-channel';
+
+// Generate secure random data
+const randomData = await generateRandomBytes(32);
+console.log('Random bytes:', randomData);
 ```
