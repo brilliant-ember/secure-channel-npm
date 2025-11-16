@@ -1,5 +1,5 @@
 import { Signature } from '../Signature';
-import { byteArrayToBase64 } from '../helpers';
+import { base64StringToByteArr, byteArrayToBase64 } from '../helpers';
 
 // Mock crypto for consistent testing
 const mockSubtle = {
@@ -22,7 +22,7 @@ const mockSignatureBytes = new Uint8Array(64); // 64 bytes for Ed25519 signature
 
 // Convert to proper base64
 const mockPublicKeyB64 = byteArrayToBase64(mockPublicKeyBytes);
-const mockSignatureB64 = byteArrayToBase64(mockSignatureBytes);
+// const mockSignatureBytes = byteArrayToBase64(mockSignatureBytes);
 const mockServerKeyB64 = byteArrayToBase64(new Uint8Array(32).fill(1)); // Different key
 
 // Set up global crypto
@@ -138,7 +138,7 @@ describe('Signature Basic Tests', () => {
         mockKeyPair.privateKey,
         new TextEncoder().encode(data)
       );
-      expect(typeof result).toBe('string'); // base64 signature
+      expect(result instanceof Uint8Array).toBe(true)
     });
 
     it('should sign Uint8Array data', async () => {
@@ -150,7 +150,8 @@ describe('Signature Basic Tests', () => {
         mockKeyPair.privateKey,
         data
       );
-      expect(typeof result).toBe('string');
+      expect(result instanceof Uint8Array).toBe(true)
+
     });
 
     it('should throw error if not initialized', async () => {
@@ -171,7 +172,7 @@ describe('Signature Basic Tests', () => {
 
     it('should verify signature with stored server key', async () => {
       const data = 'signed data';
-      const isValid = await signature.verify(mockSignatureB64, data);
+      const isValid = await signature.verify(mockSignatureBytes, data);
 
       expect(mockSubtle.verify).toHaveBeenCalledWith(
         'Ed25519',
@@ -184,7 +185,7 @@ describe('Signature Basic Tests', () => {
 
     it('should verify signature with Uint8Array data', async () => {
       const binaryData = new Uint8Array([1, 2, 3, 4, 5]);
-      await signature.verify(mockSignatureB64, binaryData);
+      await signature.verify(mockSignatureBytes, binaryData);
 
       expect(mockSubtle.verify).toHaveBeenCalledWith(
         'Ed25519',
@@ -199,7 +200,7 @@ describe('Signature Basic Tests', () => {
       (Signature as any).initialized = false;
       const newInstance = await Signature.getInstance();
 
-      await expect(newInstance.verify(mockSignatureB64, 'data'))
+      await expect(newInstance.verify(mockSignatureBytes, 'data'))
         .rejects.toThrow('Server public key not initialized');
     });
   });
@@ -207,7 +208,7 @@ describe('Signature Basic Tests', () => {
   describe('verifyWithKey', () => {
     it('should verify signature with specific public key', async () => {
       const data = 'signed data';
-      const isValid = await signature.verifyWithKey(mockPublicKeyB64, mockSignatureB64, data);
+      const isValid = await signature.verifyWithKey(mockPublicKeyBytes, mockSignatureBytes, data);
 
       expect(mockSubtle.importKey).toHaveBeenCalledWith(
         'raw',
@@ -231,7 +232,7 @@ describe('Signature Basic Tests', () => {
       const newInstance = await Signature.getInstance();
       (newInstance as any).subtle = null;
 
-      await expect(newInstance.verifyWithKey(mockPublicKeyB64, mockSignatureB64, 'data'))
+      await expect(newInstance.verifyWithKey(mockPublicKeyBytes, mockSignatureBytes, 'data'))
         .rejects.toThrow('Crypto not initialized');
     });
   });
@@ -262,14 +263,15 @@ describe('Signature Integration Tests', () => {
     // Get our public key
     const ourPublicKey = await signature.getPublicKey();
     expect(typeof ourPublicKey).toBe('string');
+    const ourPublicKeyBytes = base64StringToByteArr(ourPublicKey)
 
     // Sign data
     const dataToSign = 'important message';
-    const signatureB64 = await signature.sign(dataToSign);
-    expect(typeof signatureB64).toBe('string');
+    const sig = await signature.sign(dataToSign);
+    expect(sig instanceof Uint8Array).toBe(true);
 
     // Verify with our public key (simulating someone else verifying our signature)
-    const isValid = await signature.verifyWithKey(ourPublicKey, signatureB64, dataToSign);
+    const isValid = await signature.verifyWithKey(ourPublicKeyBytes, sig, dataToSign);
     expect(isValid).toBe(true);
   });
 
@@ -293,7 +295,7 @@ describe('Signature Integration Tests', () => {
     // Mock verification failure
     mockSubtle.verify.mockResolvedValueOnce(false);
 
-    const isValid = await signature.verify(mockSignatureB64, 'data');
+    const isValid = await signature.verify(mockSignatureBytes, 'data');
     expect(isValid).toBe(false);
   });
 });

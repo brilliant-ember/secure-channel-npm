@@ -68,9 +68,9 @@ export class Signature {
   /**
    * Sign data with our private key
    * @param data String or Uint8Array to sign
-   * @returns Base64 encoded signature
+   * @returns the signature
    */
-  public async sign(data: string | Uint8Array): Promise<string> {
+  public async sign(data: string | Uint8Array): Promise<Uint8Array> {
     if (!this.subtle || !this.keypair) throw new Error('Signature not initialized');
 
     const dataToSign = typeof data === 'string' ? new TextEncoder().encode(data) : data;
@@ -81,21 +81,20 @@ export class Signature {
       dataToSign as any
     );
 
-    return byteArrayToBase64(new Uint8Array(signature));
+    return new Uint8Array(signature);
   }
 
   /**
-   * Verify signature from server using stored server public key
-   * @param signatureB64 Base64 encoded signature to verify
+   * Verify signature from server using the stored server public key
+   * @param signature byte array signature to verify
    * @param data Original data that was signed
    * @returns boolean indicating if signature is valid
    */
-  public async verify(signatureB64: string, data: string | Uint8Array): Promise<boolean> {
+  public async verify(signatureBytes: Uint8Array, data: string | Uint8Array): Promise<boolean> {
     if (!this.subtle || !this.serverPublicKey) {
       throw new Error('Server public key not initialized. Call initializeServerKey() first.');
     }
 
-    const signatureBytes = base64StringToByteArr(signatureB64);
     const dataToVerify = typeof data === 'string' ? new TextEncoder().encode(data) : data;
 
     return await this.subtle.verify(
@@ -108,18 +107,15 @@ export class Signature {
 
   /**
    * Verify signature with a specific public key (one-time use)
-   * @param publicKeyB64 Base64 encoded public key to use for verification
-   * @param signatureB64 Base64 encoded signature to verify
+   * @param publicKey public key to use for verification
+   * @param signature signature to verify
    * @param data Original data that was signed
    * @returns boolean indicating if signature is valid
    */
-  public async verifyWithKey(publicKeyB64: string, signatureB64: string, data: string | Uint8Array): Promise<boolean> {
+  public async verifyWithKey(publicKeyBytes: Uint8Array, signatureBytes: Uint8Array, data: string | Uint8Array): Promise<boolean> {
     if (!this.subtle) throw new Error('Crypto not initialized');
 
-    const publicKeyBytes = base64StringToByteArr(publicKeyB64);
-    const signatureBytes = base64StringToByteArr(signatureB64);
     const dataToVerify = typeof data === 'string' ? new TextEncoder().encode(data) : data;
-
     const publicKey = await this.subtle.importKey(
       'raw',
       publicKeyBytes as any,

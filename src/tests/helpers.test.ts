@@ -1,12 +1,17 @@
-import { 
-  bigIntToBase64, 
-  base64ToBigInt, 
-  numberToBase64, 
+import {
+  bigIntToBase64,
+  base64ToBigInt,
+  numberToBase64,
   base64ToNumber,
   byteArrayToBase64,
   base64StringToByteArr,
   EncryptionResult,
-  generateRandomBytes
+  generateRandomBytes,
+  uint32ToBytes,
+  bytesToString,
+  copyToBuffer,
+  base64ToUint32,
+  uint32ToBase64
 } from '../helpers';
 
 describe('Helper Functions', () => {
@@ -35,11 +40,11 @@ describe('Helper Functions', () => {
       for (let i = 0; i < 256; i++) {
         allBytes[i] = i;
       }
-      
+
       const result = byteArrayToBase64(allBytes);
       expect(typeof result).toBe('string');
       expect(result.length).toBeGreaterThan(0);
-      
+
       // Should be able to round-trip
       const roundTripped = base64StringToByteArr(result);
       expect(roundTripped).toEqual(allBytes);
@@ -104,7 +109,7 @@ describe('Helper Functions', () => {
     it('should generate different values each time', async () => {
       const result1 = await generateRandomBytes(16);
       const result2 = await generateRandomBytes(16);
-      
+
       // Very unlikely to be equal for random data
       expect(result1).not.toEqual(result2);
     });
@@ -118,13 +123,13 @@ describe('Helper Functions', () => {
     it('should generate valid random bytes (distribution test)', async () => {
       const length = 1000;
       const result = await generateRandomBytes(length);
-      
+
       // Check that bytes are within valid range
       for (let i = 0; i < result.length; i++) {
         expect(result[i]).toBeGreaterThanOrEqual(0);
         expect(result[i]).toBeLessThanOrEqual(255);
       }
-      
+
       // Simple entropy check - at least some bytes should be different
       let hasDifferentBytes = false;
       for (let i = 1; i < result.length; i++) {
@@ -174,7 +179,7 @@ describe('Helper Functions', () => {
       testVectors.forEach(original => {
         const base64 = byteArrayToBase64(original);
         expect(typeof base64).toBe('string');
-        
+
         const restored = base64StringToByteArr(base64);
         expect(restored).toEqual(original);
       });
@@ -183,10 +188,10 @@ describe('Helper Functions', () => {
     it('should handle binary data that is not UTF-8', () => {
       // Create data that would be invalid UTF-8
       const binaryData = new Uint8Array([0xC0, 0xC1, 0xF5, 0xF6, 0xF7, 0xF8]);
-      
+
       const base64 = byteArrayToBase64(binaryData);
       const restored = base64StringToByteArr(base64);
-      
+
       expect(restored).toEqual(binaryData);
     });
   });
@@ -197,10 +202,10 @@ describe('Helpers Edge Cases', () => {
     for (let i = 0; i < largeArray.length; i++) {
       largeArray[i] = i % 256;
     }
-    
+
     const base64 = byteArrayToBase64(largeArray);
     const restored = base64StringToByteArr(base64);
-    
+
     expect(restored.length).toBe(largeArray.length);
     expect(restored).toEqual(largeArray);
   });
@@ -209,22 +214,22 @@ describe('Helpers Edge Cases', () => {
     const singleByte = new Uint8Array([65]); // 'A'
     const base64 = byteArrayToBase64(singleByte);
     expect(base64).toBe('QQ==');
-    
+
     const restored = base64StringToByteArr('QQ==');
     expect(restored).toEqual(singleByte);
   });
 
   it('should be consistent across multiple calls', () => {
     const data = new Uint8Array([1, 2, 3, 4, 5]);
-    
+
     const base641 = byteArrayToBase64(data);
     const base642 = byteArrayToBase64(data);
-    
+
     expect(base641).toBe(base642);
-    
+
     const restored1 = base64StringToByteArr(base641);
     const restored2 = base64StringToByteArr(base642);
-    
+
     expect(restored1).toEqual(restored2);
     expect(restored1).toEqual(data);
   });
@@ -236,7 +241,7 @@ describe('BigInt/Number Base64 Helpers', () => {
       const zero = 0n;
       const b64 = bigIntToBase64(zero);
       const result = base64ToBigInt(b64);
-      
+
       expect(result).toBe(zero);
       expect(b64).toBe('AAAAAAAAAAA='); // 8 zero bytes in base64
     });
@@ -245,7 +250,7 @@ describe('BigInt/Number Base64 Helpers', () => {
       const maxUint64 = 0xFFFFFFFFFFFFFFFFn;
       const b64 = bigIntToBase64(maxUint64);
       const result = base64ToBigInt(b64);
-      
+
       expect(result).toBe(maxUint64);
       expect(b64).toBe('//////////8=');
     });
@@ -264,7 +269,7 @@ describe('BigInt/Number Base64 Helpers', () => {
         const b64 = bigIntToBase64(value);
         const result = base64ToBigInt(b64);
         expect(result).toBe(value);
-        
+
         // Verify round-trip consistency
         const roundTrip = base64ToBigInt(bigIntToBase64(value));
         expect(roundTrip).toBe(value);
@@ -274,20 +279,20 @@ describe('BigInt/Number Base64 Helpers', () => {
     it('should handle values with specific byte patterns in BIG-ENDIAN', () => {
       // Test values that produce specific base64 patterns in BIG-ENDIAN
       const testCases = [
-        { 
-          value: 1n, 
+        {
+          value: 1n,
           expectedB64: 'AAAAAAAAAAE=' // 0x00...01 in big-endian
         },
-        { 
-          value: 256n, 
+        {
+          value: 256n,
           expectedB64: 'AAAAAAAAAQA=' // 0x00...0100 in big-endian = 256
         },
-        { 
-          value: 0x0102030405060708n, 
+        {
+          value: 0x0102030405060708n,
           expectedB64: 'AQIDBAUGBwg=' // 0x01 0x02 0x03 0x04 0x05 0x06 0x07 0x08 in big-endian
         },
-        { 
-          value: 0x0000000000000100n, 
+        {
+          value: 0x0000000000000100n,
           expectedB64: 'AAAAAAAAAQA=' // 0x00...0100 in big-endian
         }
       ];
@@ -313,7 +318,7 @@ describe('BigInt/Number Base64 Helpers', () => {
       // 4 bytes instead of 8
       const shortB64 = byteArrayToBase64(new Uint8Array(4));
       expect(() => base64ToBigInt(shortB64)).toThrow('Expected 8 bytes for uint64, got 4');
-      
+
       // 16 bytes instead of 8
       const longB64 = byteArrayToBase64(new Uint8Array(16));
       expect(() => base64ToBigInt(longB64)).toThrow('Expected 8 bytes for uint64, got 16');
@@ -325,7 +330,7 @@ describe('BigInt/Number Base64 Helpers', () => {
       const zero = 0;
       const b64 = numberToBase64(zero);
       const result = base64ToNumber(b64);
-      
+
       expect(result).toBe(zero);
       expect(b64).toBe('AAAAAAAAAAA=');
     });
@@ -334,7 +339,7 @@ describe('BigInt/Number Base64 Helpers', () => {
       const maxSafe = Number.MAX_SAFE_INTEGER;
       const b64 = numberToBase64(maxSafe);
       const result = base64ToNumber(b64);
-      
+
       expect(result).toBe(maxSafe);
     });
 
@@ -353,7 +358,7 @@ describe('BigInt/Number Base64 Helpers', () => {
         const b64 = numberToBase64(value);
         const result = base64ToNumber(b64);
         expect(result).toBe(value);
-        
+
         // Verify round-trip consistency
         const roundTrip = base64ToNumber(numberToBase64(value));
         expect(roundTrip).toBe(value);
@@ -369,7 +374,7 @@ describe('BigInt/Number Base64 Helpers', () => {
     it('should throw error when base64 exceeds safe integer range', () => {
       const largeValue = BigInt(Number.MAX_SAFE_INTEGER) + 1n;
       const b64 = bigIntToBase64(largeValue);
-      
+
       expect(() => base64ToNumber(b64)).toThrow('value exceeds safe integer range');
     });
   });
@@ -387,12 +392,12 @@ describe('BigInt/Number Base64 Helpers', () => {
 
       testValues.forEach(value => {
         const b64 = bigIntToBase64(value);
-        
+
         // Verify the base64 string has correct length for 8 bytes
         // 8 bytes in base64 = 12 characters including padding
         expect(b64.length).toBe(12);
         expect(b64.endsWith('=')).toBe(true);
-        
+
         // Verify round-trip
         expect(base64ToBigInt(b64)).toBe(value);
       });
@@ -401,14 +406,14 @@ describe('BigInt/Number Base64 Helpers', () => {
     it('should work with the existing byte array functions', () => {
       const value = 0x0102030405060708n;
       const b64FromBigInt = bigIntToBase64(value);
-      
+
       // Convert manually using byte array functions for comparison
       const buf = new ArrayBuffer(8);
       const view = new DataView(buf);
       view.setBigUint64(0, value, false); // BIG-ENDIAN
       const bytes = new Uint8Array(buf);
       const b64FromBytes = byteArrayToBase64(bytes);
-      
+
       expect(b64FromBigInt).toBe(b64FromBytes);
       expect(base64ToBigInt(b64FromBigInt)).toBe(value);
     });
@@ -417,19 +422,19 @@ describe('BigInt/Number Base64 Helpers', () => {
   describe('BIG-ENDIAN verification', () => {
     it('should use big-endian (network byte order)', () => {
       // In BIG-ENDIAN, the most significant byte comes first
-      
+
       // 0x0100000000000000 in big-endian = first byte is 0x01, rest are 0x00
       const value1 = 0x0100000000000000n;
       const b641 = bigIntToBase64(value1);
       expect(b641).toBe('AQAAAAAAAAA='); // First byte 0x01 = 'AQ'
       expect(base64ToBigInt(b641)).toBe(value1);
-      
+
       // 0x0000000000000001 in big-endian = last byte is 0x01
       const value2 = 1n;
       const b642 = bigIntToBase64(value2);
       expect(b642).toBe('AAAAAAAAAAE='); // Last byte 0x01 = 'AE'
       expect(base64ToBigInt(b642)).toBe(value2);
-      
+
       // Verify they are different
       expect(b641).not.toBe(b642);
     });
@@ -440,7 +445,7 @@ describe('BigInt/Number Base64 Helpers', () => {
       const b64 = bigIntToBase64(value1);
       expect(b64).toBe('AAEAAAAAAAA=');
       expect(base64ToBigInt(b64)).toBe(value1);
-      
+
       // 0x1234567890ABCDEF in big-endian = bytes in order: 0x12, 0x34, 0x56, 0x78, 0x90, 0xAB, 0xCD, 0xEF
       const value2 = 0x1234567890ABCDEFn;
       const b642 = bigIntToBase64(value2);
@@ -451,11 +456,11 @@ describe('BigInt/Number Base64 Helpers', () => {
     it('should demonstrate big-endian vs little-endian difference', () => {
       // This shows the difference between big-endian and what little-endian would be
       const value = 0x0102030405060708n;
-      
+
       // BIG-ENDIAN: bytes in memory: [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
       const bigEndianB64 = bigIntToBase64(value);
       expect(bigEndianB64).toBe('AQIDBAUGBwg=');
-      
+
       // If it were LITTLE-ENDIAN, bytes would be reversed: [0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01]
       // But our functions always use BIG-ENDIAN
       expect(base64ToBigInt(bigEndianB64)).toBe(value);
@@ -496,6 +501,239 @@ describe('BigInt/Number Base64 Helpers', () => {
         const result = base64ToBigInt(b64);
         expect(result).toBe(value);
       });
+    });
+  });
+});
+
+describe('uint32ToBytes', () => {
+  it('should convert zero correctly', () => {
+    const result = uint32ToBytes(0);
+    expect(result).toEqual(new Uint8Array([0, 0, 0, 0]));
+  });
+
+  it('should convert maximum uint32 value', () => {
+    const result = uint32ToBytes(0xFFFFFFFF);
+    expect(result).toEqual(new Uint8Array([0xFF, 0xFF, 0xFF, 0xFF]));
+  });
+
+  it('should convert typical values correctly', () => {
+    // Test 1: 0x01234567
+    expect(uint32ToBytes(0x01234567))
+      .toEqual(new Uint8Array([0x01, 0x23, 0x45, 0x67]));
+
+    // Test 2: 0x12345678  
+    expect(uint32ToBytes(0x12345678))
+      .toEqual(new Uint8Array([0x12, 0x34, 0x56, 0x78]));
+
+    // Test 3: 255 (single byte significant)
+    expect(uint32ToBytes(255))
+      .toEqual(new Uint8Array([0, 0, 0, 0xFF]));
+  });
+
+  it('should handle numbers that span multiple bytes', () => {
+    // 256 = 0x00000100
+    expect(uint32ToBytes(256))
+      .toEqual(new Uint8Array([0, 0, 1, 0]));
+
+    // 65536 = 0x00010000
+    expect(uint32ToBytes(65536))
+      .toEqual(new Uint8Array([0, 1, 0, 0]));
+
+    // 16777216 = 0x01000000
+    expect(uint32ToBytes(16777216))
+      .toEqual(new Uint8Array([1, 0, 0, 0]));
+  });
+
+  it('should throw error for numbers below 0', () => {
+    expect(() => uint32ToBytes(-1)).toThrow('Number must be a valid uint32');
+    expect(() => uint32ToBytes(-100)).toThrow('Number must be a valid uint32');
+  });
+
+  it('should throw error for numbers above uint32 max', () => {
+    expect(() => uint32ToBytes(0xFFFFFFFF + 1)).toThrow('Number must be a valid uint32');
+    expect(() => uint32ToBytes(9999999999)).toThrow('Number must be a valid uint32');
+  });
+
+  it('should throw error for non-integers', () => {
+    expect(() => uint32ToBytes(123.456)).toThrow('Number must be a valid uint32');
+    expect(() => uint32ToBytes(NaN)).toThrow('Number must be a valid uint32');
+    expect(() => uint32ToBytes(Infinity)).toThrow('Number must be a valid uint32');
+  });
+
+  it('should produce consistent results across multiple calls', () => {
+    const num = 0xDEADBEEF;
+    const first = uint32ToBytes(num);
+    const second = uint32ToBytes(num);
+
+    expect(first).toEqual(second);
+    expect(Array.from(first)).toEqual([0xDE, 0xAD, 0xBE, 0xEF]);
+  });
+});
+
+
+describe('copyToBuffer', () => {
+  it('should copy string to buffer', () => {
+    const buffer = new Uint8Array(10);
+    const newOffset = copyToBuffer(buffer, 0, "hello");
+
+    expect(newOffset).toBe(5);
+    expect(Array.from(buffer.slice(0, 5))).toEqual([104, 101, 108, 108, 111]);
+  });
+
+  it('should copy Uint8Array to buffer', () => {
+    const buffer = new Uint8Array(10);
+    const data = new Uint8Array([1, 2, 3, 4]);
+    const newOffset = copyToBuffer(buffer, 2, data);
+
+    expect(newOffset).toBe(6);
+    expect(Array.from(buffer.slice(2, 6))).toEqual([1, 2, 3, 4]);
+  });
+
+  it('should handle empty inputs', () => {
+    const buffer = new Uint8Array(5);
+    const offset1 = copyToBuffer(buffer, 0, "");
+    const offset2 = copyToBuffer(buffer, 0, new Uint8Array(0));
+
+    expect(offset1).toBe(0);
+    expect(offset2).toBe(0);
+  });
+
+  it('should throw on buffer overflow', () => {
+    const buffer = new Uint8Array(3);
+    expect(() => copyToBuffer(buffer, 0, "hello")).toThrow('Buffer overflow');
+    expect(() => copyToBuffer(buffer, 2, new Uint8Array([1, 2]))).toThrow('Buffer overflow');
+  });
+
+  it('should throw on invalid offset', () => {
+    const buffer = new Uint8Array(5);
+    expect(() => copyToBuffer(buffer, -1, "hi")).toThrow('Offset -1 is out of bounds for buffer length 5');
+    expect(() => copyToBuffer(buffer, 10, "hi")).toThrow('Offset 10 is out of bounds for buffer length 5');
+  });
+
+  it('should throw on invalid source type', () => {
+    const buffer = new Uint8Array(5);
+    expect(() => copyToBuffer(buffer, 0, 123 as any)).toThrow('Source must be a string or Uint8Array');
+  });
+});
+
+describe('bytesToString', () => {
+  it('should decode ASCII text', () => {
+    const bytes = new Uint8Array([104, 101, 108, 108, 111]); // "hello"
+    expect(bytesToString(bytes)).toBe("hello");
+  });
+
+  it('should decode UTF-8 text', () => {
+    // "café" in UTF-8
+    const bytes = new Uint8Array([99, 97, 102, 195, 169]);
+    expect(bytesToString(bytes)).toBe("café");
+  });
+
+  it('should handle different input types', () => {
+    const data = [104, 101, 108, 108, 111];
+
+    expect(bytesToString(new Uint8Array(data))).toBe("hello");
+    expect(bytesToString(data)).toBe("hello"); // number array
+    expect(bytesToString(new Uint8Array(data).buffer)).toBe("hello"); // ArrayBuffer
+  });
+
+  it('should handle empty input', () => {
+    expect(bytesToString(new Uint8Array(0))).toBe("");
+    expect(bytesToString([])).toBe("");
+  });
+
+  it('should throw on invalid input', () => {
+    expect(() => bytesToString(null as any)).toThrow('Input cannot be null');
+    expect(() => bytesToString(undefined as any)).toThrow('Input cannot be null');
+    expect(() => bytesToString("string" as any)).toThrow('Input must be Uint8Array');
+  });
+
+});
+
+describe('uint32ToBase64 and base64ToUint32', () => {
+  describe('uint32ToBase64', () => {
+    it('should convert zero correctly', () => {
+      const result = uint32ToBase64(0);
+      expect(result).toBe('AAAAAA=='); // 4 zero bytes in base64
+    });
+
+    it('should convert maximum uint32 value', () => {
+      const result = uint32ToBase64(0xFFFFFFFF);
+      expect(result).toBe('/////w=='); // 4 0xFF bytes in base64
+    });
+
+
+    it('should throw error for invalid numbers', () => {
+      expect(() => uint32ToBase64(-1)).toThrow('Number must be a valid uint32');
+      expect(() => uint32ToBase64(0xFFFFFFFF + 1)).toThrow('Number must be a valid uint32');
+      expect(() => uint32ToBase64(3.14)).toThrow('Number must be a valid uint32');
+    });
+  });
+
+  describe('base64ToUint32', () => {
+    it('should decode zero correctly', () => {
+      const result = base64ToUint32('AAAAAA==');
+      expect(result).toBe(0);
+    });
+
+    it('should decode maximum value correctly', () => {
+      const result = base64ToUint32('/////w==');
+      expect(result).toBe(0xFFFFFFFF);
+    });
+
+    it('should decode typical values correctly', () => {
+      const testCases = [
+        { num: 0, expectedB64: 'AAAAAA==' },      // bytes [0, 0, 0, 0]
+        { num: 1, expectedB64: 'AAAAAQ==' },      // bytes [0, 0, 0, 1] 
+        { num: 256, expectedB64: 'AAABAA==' },    // bytes [0, 0, 1, 0] - FIXED
+        { num: 0x01020304, expectedB64: 'AQIDBA==' }, // bytes [1, 2, 3, 4]
+        { num: 0xFFFFFFFF, expectedB64: '/////w==' }, // bytes [255, 255, 255, 255]
+      ];
+      for (const { num, expectedB64 } of testCases) {
+        const encoded = uint32ToBase64(num);
+        expect(encoded).toBe(expectedB64);
+        const decoded = base64ToUint32(encoded);
+        expect(decoded).toBe(num);
+      }
+    });
+
+    it('should be the inverse of uint32ToBase64', () => {
+      const testValues = [0, 1, 255, 256, 65536, 16777216, 123456789, 0xFFFFFFFF];
+
+      for (const value of testValues) {
+        const encoded = uint32ToBase64(value);
+        const decoded = base64ToUint32(encoded);
+        expect(decoded).toBe(value);
+      }
+    });
+
+    it('should throw error for invalid base64', () => {
+      expect(() => base64ToUint32('!!!')).toThrow('Base64 must represent exactly 4 bytes');
+      expect(() => base64ToUint32('')).toThrow('Base64 must represent exactly 4 bytes');
+      expect(() => base64ToUint32('A')).toThrow('Base64 must represent exactly 4 bytes');
+      expect(() => base64ToUint32('AAAAAAAA')).toThrow('Base64 must represent exactly 4 bytes');
+    });
+
+    it('should throw error for non-string input', () => {
+      expect(() => base64ToUint32(123 as any)).toThrow('Invalid base64 string');
+    });
+  });
+
+  describe('cross-platform compatibility', () => {
+    it('should produce same results in Node.js and browser', () => {
+      const testCases = [
+        { num: 0, expectedB64: 'AAAAAA==' },
+        { num: 1, expectedB64: 'AAAAAQ==' },
+        { num: 0x01020304, expectedB64: 'AQIDBA==' },
+        { num: 0xFFFFFFFF, expectedB64: '/////w==' },
+      ];
+
+      for (const { num, expectedB64 } of testCases) {
+        const encoded = uint32ToBase64(num);
+        expect(encoded).toBe(expectedB64);
+
+        const decoded = base64ToUint32(encoded);
+        expect(decoded).toBe(num);
+      }
     });
   });
 });
