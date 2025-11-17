@@ -300,3 +300,86 @@ export function base64ToUint32(b64: string): number {
   // @ts-expect-error
   return (bytes[0] << 24 | bytes[1] << 16 | bytes[2] << 8 | bytes[3]) >>> 0;
 }
+
+/**
+ * Converts a Uint8Array to a UTF-8 string using TextDecoder
+ * @param bytes - Uint8Array containing UTF-8 encoded bytes
+ * @returns Decoded string
+ */
+export function byteArrayToString(bytes: Uint8Array): string {
+    const decoder = new TextDecoder('utf-8');
+    return decoder.decode(bytes);
+}
+
+/**
+ * Converts objects with binary data to  JSON-serializable format
+ * Recursively transforms binary types (Uint8Array, ArrayBuffer, etc.) to number arrays
+ * while preserving the structure of nested objects and arrays
+ */
+export function convertToJsonSerializable<T>(obj: T): any {
+  // Handle binary data types
+  if (isBinaryData(obj as any)) {
+    return convertBinaryToArray(obj as any);
+  }
+  
+  // Handle arrays recursively
+  if (Array.isArray(obj)) {
+    return obj.map(convertToJsonSerializable);
+  }
+  
+  // Handle plain objects recursively
+  if (isPlainObject(obj)) {
+    const result: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = convertToJsonSerializable(value);
+    }
+    return result;
+  }
+  
+  // Return primitives and other values as-is
+  return obj;
+}
+
+/**
+ * Converts various binary data types to a number array for JSON serialization
+ */
+function convertBinaryToArray(binaryData: Uint8Array | ArrayBuffer | ArrayBufferView): number[] {
+  if (binaryData instanceof Uint8Array) {
+    return Array.from(binaryData);
+  }
+  if (binaryData instanceof ArrayBuffer) {
+    return Array.from(new Uint8Array(binaryData));
+  }
+  if (ArrayBuffer.isView(binaryData)) {
+    return Array.from(new Uint8Array(binaryData.buffer));
+  }
+  return [];
+}
+
+/**
+ * Checks if a value is binary data that needs conversion for JSON serialization
+ */
+function isBinaryData(value: any): value is Uint8Array | ArrayBuffer | ArrayBufferView {
+  // Handle Node.js Buffer without importing the type
+  const isNodeBuffer = typeof Buffer !== 'undefined' && 
+                       typeof value === 'object' && 
+                       value !== null &&
+                       (value as any).constructor?.name === 'Buffer';
+  
+  return value instanceof Uint8Array ||
+         value instanceof ArrayBuffer ||
+         isNodeBuffer ||
+         ArrayBuffer.isView(value);
+}
+
+
+/**
+ * Checks if a value is a plain object (not array, not null)
+ */
+function isPlainObject(value: any): value is Record<string, any> {
+  return value !== null && 
+         typeof value === 'object' && 
+         !Array.isArray(value) &&
+         !(value instanceof Date) &&
+         !(value instanceof RegExp);
+}

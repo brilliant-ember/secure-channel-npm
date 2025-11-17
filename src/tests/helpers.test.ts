@@ -11,7 +11,9 @@ import {
   bytesToString,
   copyToBuffer,
   base64ToUint32,
-  uint32ToBase64
+  uint32ToBase64,
+  byteArrayToString,
+  convertToJsonSerializable
 } from '../helpers';
 
 describe('Helper Functions', () => {
@@ -733,6 +735,193 @@ describe('uint32ToBase64 and base64ToUint32', () => {
 
         const decoded = base64ToUint32(encoded);
         expect(decoded).toBe(num);
+      }
+    });
+  });
+});
+
+describe('byteArrayToString', () => {
+  it('should decode ASCII text', () => {
+    const bytes = new Uint8Array([104, 101, 108, 108, 111]); // "hello"
+    expect(byteArrayToString(bytes)).toBe("hello");
+  });
+
+  it('should decode UTF-8 text', () => {
+    // "café" in UTF-8
+    const bytes = new Uint8Array([99, 97, 102, 195, 169]);
+    expect(byteArrayToString(bytes)).toBe("café");
+  });
+
+  it('should handle empty input', () => {
+    expect(byteArrayToString(new Uint8Array(0))).toBe("");
+  });
+
+  it('should handle emoji', () => {
+    // "Test 😀" in UTF-8
+    const bytes = new Uint8Array([84, 101, 115, 116, 32, 240, 159, 152, 128]);
+    expect(byteArrayToString(bytes)).toBe("Test 😀");
+  });
+
+  it('should handle various input types', () => {
+    const bytes = new Uint8Array([72, 101, 108, 108, 111]); // "Hello"
+    expect(byteArrayToString(bytes)).toBe("Hello");
+  });
+});
+
+describe('convertToJsonSerializable', () => {
+  it('should convert Uint8Array to number array', () => {
+    const input = new Uint8Array([1, 2, 3, 4, 5]);
+    const result = convertToJsonSerializable(input);
+    expect(result).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('should convert ArrayBuffer to number array', () => {
+    const buffer = new Uint8Array([10, 20, 30]).buffer;
+    const result = convertToJsonSerializable(buffer);
+    expect(result).toEqual([10, 20, 30]);
+  });
+
+  it('should handle nested objects with binary data', () => {
+    const input = {
+      name: "test",
+      data: new Uint8Array([1, 2, 3]),
+      nested: {
+        buffer: new Uint8Array([4, 5, 6]).buffer,
+        value: 42
+      }
+    };
+    
+    const result = convertToJsonSerializable(input);
+    
+    expect(result).toEqual({
+      name: "test",
+      data: [1, 2, 3],
+      nested: {
+        buffer: [4, 5, 6],
+        value: 42
+      }
+    });
+  });
+
+  it('should handle arrays containing binary data', () => {
+    const input = [
+      "string",
+      new Uint8Array([1, 2, 3]),
+      { buffer: new Uint8Array([4, 5, 6]).buffer }
+    ];
+    
+    const result = convertToJsonSerializable(input);
+    
+    expect(result).toEqual([
+      "string",
+      [1, 2, 3],
+      { buffer: [4, 5, 6] }
+    ]);
+  });
+
+  it('should leave primitives unchanged', () => {
+    expect(convertToJsonSerializable("hello")).toBe("hello");
+    expect(convertToJsonSerializable(42)).toBe(42);
+    expect(convertToJsonSerializable(true)).toBe(true);
+    expect(convertToJsonSerializable(null)).toBe(null);
+    expect(convertToJsonSerializable(undefined)).toBe(undefined);
+  });
+
+  it('should handle empty binary data', () => {
+    expect(convertToJsonSerializable(new Uint8Array(0))).toEqual([]);
+    expect(convertToJsonSerializable(new ArrayBuffer(0))).toEqual([]);
+  });
+
+  it('should handle complex nested structures', () => {
+    const input = {
+      users: [
+        {
+          id: 1,
+          avatar: new Uint8Array([255, 255, 255]),
+          settings: {
+            theme: "dark",
+            data: new Uint8Array([1, 2, 3])
+          }
+        }
+      ],
+      metadata: new Uint8Array([0, 1, 2])
+    };
+    
+    const result = convertToJsonSerializable(input);
+    
+    expect(result).toEqual({
+      users: [
+        {
+          id: 1,
+          avatar: [255, 255, 255],
+          settings: {
+            theme: "dark",
+            data: [1, 2, 3]
+          }
+        }
+      ],
+      metadata: [0, 1, 2]
+    });
+  });
+
+  it('should handle Date objects by leaving them as-is', () => {
+    const date = new Date('2023-01-01');
+    const result = convertToJsonSerializable(date);
+    expect(result).toBe(date);
+  });
+
+  it('should handle RegExp objects by leaving them as-is', () => {
+    const regex = /test/gi;
+    const result = convertToJsonSerializable(regex);
+    expect(result).toBe(regex);
+  });
+
+  it('should handle other typed arrays', () => {
+    const int16Array = new Int16Array([1, 2, 3]);
+    const result = convertToJsonSerializable(int16Array);
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should handle mixed types in arrays', () => {
+    const input = [
+      1,
+      "text",
+      new Uint8Array([1, 2]),
+      { data: new Uint8Array([3, 4]) },
+      null
+    ];
+    
+    const result = convertToJsonSerializable(input);
+    
+    expect(result).toEqual([
+      1,
+      "text",
+      [1, 2],
+      { data: [3, 4] },
+      null
+    ]);
+  });
+
+  it('should handle deeply nested binary data', () => {
+    const input = {
+      level1: {
+        level2: {
+          level3: {
+            data: new Uint8Array([1, 2, 3])
+          }
+        }
+      }
+    };
+    
+    const result = convertToJsonSerializable(input);
+    
+    expect(result).toEqual({
+      level1: {
+        level2: {
+          level3: {
+            data: [1, 2, 3]
+          }
+        }
       }
     });
   });

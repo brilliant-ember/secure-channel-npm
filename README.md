@@ -78,6 +78,7 @@ async function main() {
     sc.generateRandomBytes(32); 
     sc.bigIntToBase64(1n); 
     sc.base64ToBigInt(b64); 
+    sc.convertToJsonSerializable(obj);
 }
 
 ```
@@ -239,4 +240,27 @@ const message = {
 const serialized = serializeData(message);
 console.log('Serialized size:', serialized.length);
 
+```
+
+#### Convert to JSON serializable
+
+```typescript
+
+// Storing binary data in JSON-based storage (LocalStorage, Redis, etc.)
+function saveToStorage(key: string, data: any) {
+  const serializableData = convertToJsonSerializable(data);
+  localStorage.setItem(key, JSON.stringify(serializableData));
+}
+
+// Usage with binary user data
+const userData = {
+  id: 123,
+  profileImage: new Uint8Array([255, 255, 255, 0]), // Binary image data
+  preferences: {
+    theme: "dark",
+    customData: new Uint8Array([1, 2, 3])
+  }
+};
+
+saveToStorage("userData", userData);
 ```
